@@ -1,20 +1,34 @@
 import pandas as pd
 from config import TOLERANCE_HOURS
-from core.name_utils import normalize_name
+from core.name_utils import normalize_name, names_match
 
 
 def compare_data(file1_df: pd.DataFrame, file2_records: list) -> pd.DataFrame:
     results = []
 
-    # Индекс Файла 1 для O(1) поиска
-    f1_index = {}
-    for _, row in file1_df.iterrows():
-        key = normalize_name(row['ФИО_очищенное'])
-        f1_index[key] = row['План_ИС_ВВГУ']
-
     for rec in file2_records:
-        key = normalize_name(rec['ФИО'])
-        plan_is = f1_index.get(key, None)
+        found_match = False
+        plan_is = None
+        matched_row = None
+
+        # Ищем совпадение по ФИО + Кафедра с использованием умного сравнения имен
+        for _, row in file1_df.iterrows():
+            if names_match(rec['ФИО'], row['ФИО_очищенное']):
+                # Дополнительная проверка кафедры (если есть в записи)
+                if 'Кафедра' in rec and rec['Кафедра']:
+                    if rec['Кафедра'].upper() in row['Кафедра'].upper() or \
+                            row['Кафедра'].upper() in rec['Кафедра'].upper():
+                        found_match = True
+                        plan_is = row['План_ИС_ВВГУ']
+                        matched_row = row
+                        break
+                else:
+                    # Если кафедра не указана, считаем совпадением
+                    found_match = True
+                    plan_is = row['План_ИС_ВВГУ']
+                    matched_row = row
+                    break
+
         plan_f2 = rec['План_Из_Файла2']
         fact_f2 = rec['Факт_Из_Файла2']
 
@@ -23,16 +37,17 @@ def compare_data(file1_df: pd.DataFrame, file2_records: list) -> pd.DataFrame:
         highlight = False
         status = ""
 
-        if plan_is is not None:
+        if found_match:
             diff_plan = plan_f2 - plan_is
-            # ТЗ: если разница != 0 -> подсветка. Допуск ±5ч для статуса
+            # ТЗ: если разница != 0 -> подсветка
             if diff_plan != 0:
                 highlight = True
-                status = "Расхождение"
-            elif abs(diff_plan) <= TOLERANCE_HOURS:
-                status = "В допуске (±5ч)"
+                if abs(diff_plan) <= TOLERANCE_HOURS:
+                    status = "Расхождение в допуске (±5ч)"
+                else:
+                    status = "Расхождение"
             else:
-                status = "В норме"
+                status = "✓ Совпадает"
         else:
             status = "❌ Отсутствует в ИС ВВГУ"
             highlight = True  # Пункт 4 ТЗ
@@ -43,7 +58,7 @@ def compare_data(file1_df: pd.DataFrame, file2_records: list) -> pd.DataFrame:
 
         results.append({
             'ФИО ППС': rec['ФИО'],
-            'Кафедра_ИС': "Не найдено" if plan_is is None else "Есть",
+            'Кафедра_ИС': matched_row['Кафедра'] if matched_row is not None else "Не найдено",
             'План (ИС ВВГУ)': plan_is if plan_is is not None else "Нет данных",
             'План (Файл 2)': plan_f2,
             'Факт (Файл 2)': fact_f2 if fact_f2 is not None else "-",

@@ -7,30 +7,46 @@ from typing import Dict, Optional
 def parse_file2(filepath: str) -> Optional[Dict]:
     wb = openpyxl.load_workbook(filepath, data_only=True)
 
-    # 1. Ищем лист с итогами
+    # Ищем лист с итогами
     sheet = None
     for name in wb.sheetnames:
         if 'ИТОГ' in name.upper():
             sheet = wb[name]
             break
-    if not sheet: return None
+    if not sheet:
+        wb.close()
+        return None
 
-    # 2. Извлекаем ФИО из шапки (строки 2-4)
+    # Улучшенный поиск ФИО - ищем в первых 15 строках
     fio = "Неизвестный"
-    for row in sheet.iter_rows(min_row=2, max_row=4, max_col=1):
-        cell_val = str(row[0].value or "")
+    for row_idx in range(2, 15):
+        cell_val = str(sheet.cell(row=row_idx, column=1).value or "")
+        # Ищем паттерн: "Фамилия И.О." или "Фамилия Имя Отчество, должность"
         if any(x in cell_val for x in ['Заведующий', 'Доцент', 'Старший', 'Профессор', 'Ассистент']):
-            fio = re.split(r'\s*(Заведующий|Доцент|Старший|Профессор|Ассистент)', cell_val)[0].strip()
-            break
+            # Извлекаем ФИО до запятой или должности
+            match = re.match(
+                r'^([А-Яа-яЁё\.\s\-]+?)(?:\s{2,}|,|\s+Заведующий|\s+Доцент|\s+Профессор|\s+Старший|\s+Ассистент)',
+                cell_val)
+            if match:
+                fio = match.group(1).strip()
+                break
 
-    # 3. Парсим таблицу итогов
+    # Парсим таблицу итогов (ищем по ключевым словам)
     totals = {'План_Учебная': 0, 'План_ВтораяПоловина': 0, 'Факт_Итого': None}
-    for row in sheet.iter_rows(min_row=10, max_row=25, values_only=True):
-        if not row[0]: continue
-        label = str(row[0]).strip().lower()
-        val = row[2]  # Колонка C с часами
 
-        if val is None: continue
+    for row_idx in range(10, 30):
+        label_cell = sheet.cell(row=row_idx, column=1)
+        val_cell = sheet.cell(row=row_idx, column=3)
+
+        if not label_cell.value:
+            continue
+
+        label = str(label_cell.value).strip().lower()
+        val = val_cell.value
+
+        if val is None:
+            continue
+
         if 'учебная нагрузка' in label:
             totals['План_Учебная'] = float(val)
         elif 'неконтактная' in label or 'вторая половина' in label:
