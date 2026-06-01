@@ -10,24 +10,16 @@ def compare_data(file1_df: pd.DataFrame, file2_records: list) -> pd.DataFrame:
         found_match = False
         plan_is = None
         matched_row = None
+        matched_fio = None
 
-        # Ищем совпадение по ФИО + Кафедра с использованием умного сравнения имен
+        # Ищем совпадение по ФИО с использованием умного сравнения
         for _, row in file1_df.iterrows():
             if names_match(rec['ФИО'], row['ФИО_очищенное']):
-                # Дополнительная проверка кафедры (если есть в записи)
-                if 'Кафедра' in rec and rec['Кафедра']:
-                    if rec['Кафедра'].upper() in row['Кафедра'].upper() or \
-                            row['Кафедра'].upper() in rec['Кафедра'].upper():
-                        found_match = True
-                        plan_is = row['План_ИС_ВВГУ']
-                        matched_row = row
-                        break
-                else:
-                    # Если кафедра не указана, считаем совпадением
-                    found_match = True
-                    plan_is = row['План_ИС_ВВГУ']
-                    matched_row = row
-                    break
+                found_match = True
+                plan_is = row['План_ИС_ВВГУ']
+                matched_row = row
+                matched_fio = row['ФИО_очищенное']
+                break
 
         plan_f2 = rec['План_Из_Файла2']
         fact_f2 = rec['Факт_Из_Файла2']
