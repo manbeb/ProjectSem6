@@ -8,10 +8,7 @@ from core.comparator import compare_data
 from exporters.file4_exporter import export_file4
 
 
-def run_pipeline(file1_path: str, dir2_path: str, output_dir: str):
-    """
-    Основная логика. Принимает пути из GUI.
-    """
+def main():
     print("🚀 Запуск процедуры сравнения нагрузки ППС ВВГУ...")
     os.makedirs(output_dir, exist_ok=True)
 
@@ -35,9 +32,11 @@ def run_pipeline(file1_path: str, dir2_path: str, output_dir: str):
 
     file2_records = []
     for path in file2_paths:
+        # Парсим файл БЕЗ явного указания кафедры - она будет определена автоматически
         rec = parse_file2(path)
         if rec:
             file2_records.append(rec)
+
     print(f"   ✅ Обработано планов: {len(file2_records)}")
 
     # 3. Сравнение
@@ -54,10 +53,7 @@ def run_pipeline(file1_path: str, dir2_path: str, output_dir: str):
     mismatches = result_df[result_df['Статус'].str.contains('Расхождение|Отсутствует', na=False)].shape[0]
     print(f"\n📊 ОТЧЁТ: Всего проверено {len(result_df)} ППС. Требуют внимания: {mismatches}")
 
-    return result_df, file4_path
 
-
-# Для запуска из консоли (тестирования)
 if __name__ == "__main__":
     run_pipeline(
         file1_path=FILE1_PATH,

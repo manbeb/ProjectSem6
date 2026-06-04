@@ -19,8 +19,7 @@ def export_file4(df: pd.DataFrame, output_path: str = None):
     # 3. Стилизация заголовка
     for col in range(1, len(df.columns) + 1):
         cell = ws.cell(row=1, column=col)
-        cell.fill = BLUE_HEADER
-        cell.font = Font(color="FFFFFF", bold=True)
+        cell.font = Font(color="000000", bold=True)
         cell.alignment = openpyxl.styles.Alignment(wrap_text=True)
 
     # 4. Подсветка строк
