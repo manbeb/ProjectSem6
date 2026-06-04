@@ -1,6 +1,5 @@
 import pandas as pd
 import re
-from config import FILE1_PATH
 
 
 def clean_name(name: str) -> str:
@@ -9,9 +8,13 @@ def clean_name(name: str) -> str:
     return re.sub(r'\s*\(\d+\)', '', str(name).strip())
 
 
-def parse_file1() -> pd.DataFrame:
+def parse_file1(file_path: str = None) -> pd.DataFrame:
     # 1. Читаем "сырой" файл без шапки
-    df_raw = pd.read_excel(FILE1_PATH, header=None)
+    if file_path is None:
+        from config import FILE1_PATH
+        file_path = FILE1_PATH
+
+    df_raw = pd.read_excel(file_path, header=None)
 
     # Динамический поиск строки, где есть "Преподаватель"
     header_idx = None
