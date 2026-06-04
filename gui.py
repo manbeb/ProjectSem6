@@ -285,66 +285,48 @@ class XPStyleApp:
 
             file1_path = self._file1_full_path
             dir2_path = self.dir2_path.get()
-            output_dir = self.output_dir.get()
+            base_output_dir = self.output_dir.get()
 
-            os.makedirs(output_dir, exist_ok=True)
+            # Создаём папку для отчёта через сервис
+            from service import WorkloadService
+            service = WorkloadService()
+            output_dir = service.create_report_folder(base_output_dir)
 
-            # Формируем полные пути для сохранения
-            file3_path = os.path.join(output_dir, "Файл 3_Агрегированный.xlsx")
-            file4_path = os.path.join(output_dir, "Файл 4_Сравнение.xlsx")
+            # Обновляем отображение в GUI
+            folder_name = os.path.basename(output_dir)
+            self.output_dir_display.set(f"📁 {folder_name}")
+            print(f"📂 Папка отчёта: {output_dir}")
 
-            # === Шаг 1: Чтение Файла 1 ===
-            print("📖 Шаг 1: Чтение и агрегация Файла 1...")
-            # ВАЖНО: parse_file1 теперь принимает путь как аргумент
-            file1_df = parse_file1(file1_path)
-            file1_df.to_excel(file3_path, index=False)
-            print(f"   ✅ Файл 3 сохранён: {file3_path}")
+            # Вызываем обработку через сервис
+            result = service.process_workload(file1_path, dir2_path, output_dir)
 
-            # === Шаг 2: Чтение Файлов 2 ===
-            print("📂 Шаг 2: Поиск и парсинг индивидуальных планов...")
-            file2_paths = glob.glob(os.path.join(dir2_path, "*.xlsx"))
-
-            if not file2_paths:
-                print("   ⚠️ В папке не найдено Excel-файлов!")
+            if not result.success:
                 self.status_text.set("Ошибка")
-                messagebox.showwarning("Внимание", "В выбранной папке не найдены файлы Excel!")
+                messagebox.showerror("Ошибка", result.error)
                 return
 
-            file2_records = []
-            for path in file2_paths:
-                print(f"   ⏳ Чтение: {os.path.basename(path)}")
-                try:
-                    rec = parse_file2(path)
-                    if rec:
-                        file2_records.append(rec)
-                except Exception as e:
-                    print(f"   ❌ Ошибка чтения {os.path.basename(path)}: {e}")
-
-            print(f"   ✅ Обработано планов: {len(file2_records)}")
-
-            # === Шаг 3: Сравнение ===
-            print("⚖️ Шаг 3: Сравнение нагрузок...")
-            # compare_data принимает DataFrame из Файла 1 и список словарей из Файлов 2
-            result_df = compare_data(file1_df, file2_records)
-            print("   ✅ Сравнение завершено.")
-
-            # === Шаг 4: Экспорт ===
-            print("💾 Шаг 4: Формирование отчёта с подсветкой...")
-            # export_file4 принимает DataFrame и путь для сохранения
-            export_file4(result_df, file4_path)
-            print(f"   ✅ Готово! Результат: {file4_path}")
-
-            # Итоговая статистика
-            mismatches = result_df[result_df['Статус'].str.contains('Расхождение|Отсутствует', na=False)].shape[0]
-            print(f"\n📊 ОТЧЁТ: Всего проверено {len(result_df)} ППС. Требуют внимания: {mismatches}")
-
+            # Успех
             self.status_text.set("Готово")
-            messagebox.showinfo("Успех", f"Отчёт сформирован успешно!\n\nНайдено расхождений: {mismatches}")
+
+            error_details = ""
+            if result.errors:
+                error_details = f"\n\nПредупреждения:\n" + "\n".join(result.errors[:3])
+                if len(result.errors) > 3:
+                    error_details += f"\n... и ещё {len(result.errors) - 3} ошибок"
+
+            messagebox.showinfo(
+                "Успех",
+                f"Отчёт сформирован успешно!\n\n"
+                f"Всего проверено: {result.total_count} ППС\n"
+                f"Требуют внимания: {result.mismatches}\n\n"
+                f"Папка отчёта:\n{output_dir}"
+                f"{error_details}"
+            )
 
         except Exception as e:
             import traceback
             error_msg = f"{str(e)}\n\n{traceback.format_exc()}"
-            print(f"\n ОШИБКА: {error_msg}")
+            print(f"\n❌ ОШИБКА: {error_msg}")
             self.status_text.set("Ошибка")
             messagebox.showerror("Ошибка", f"Произошла ошибка:\n{str(e)}")
         finally:
