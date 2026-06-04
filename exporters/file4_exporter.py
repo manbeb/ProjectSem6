@@ -19,12 +19,18 @@ def _apply_formatting(filepath: str, df: pd.DataFrame):
         cell.font = Font(color="000000", bold=True)
         cell.alignment = Alignment(wrap_text=True)
 
+    # 🔑 КРИТИЧНО: сбрасываем индекс, чтобы он шёл строго 0, 1, 2...
+    # Это исправляет "съехавшую" подсветку в отчётах по кафедрам
+    df = df.reset_index(drop=True)
+
     # Подсветка строк с расхождениями
-    for i, row in df.iterrows():
+    for row_idx, row in df.iterrows():
         status = str(row.get('Статус', ''))
         if 'Расхождение' in status or 'Отсутствует' in status:
+            # row_idx начинается с 0, +2 т.к. 1-я строка Excel = заголовок
+            excel_row = row_idx + 2
             for col in range(1, len(df.columns) + 1):
-                ws.cell(row=i + 2, column=col).fill = YELLOW_FILL
+                ws.cell(row=excel_row, column=col).fill = YELLOW_FILL
 
     wb.save(filepath)
     wb.close()
@@ -46,7 +52,6 @@ def export_reports(result_df: pd.DataFrame, output_dir: str) -> dict:
 
     # 2. Отчёты по кафедрам
     df_clean = result_df.copy()
-    # Безопасная обработка названий кафедр
     df_clean['Кафедра'] = df_clean['Кафедра'].fillna("Не указана").astype(str).str.strip()
 
     grouped = df_clean.groupby('Кафедра')
@@ -58,7 +63,7 @@ def export_reports(result_df: pd.DataFrame, output_dir: str) -> dict:
 
         dept_path = os.path.join(output_dir, f"Отчёт_{clean_dept}.xlsx")
         group_df.to_excel(dept_path, index=False, sheet_name="Сравнение")
-        _apply_formatting(dept_path, group_df)
+        _apply_formatting(dept_path, group_df)  # Теперь индекс сбросится внутри функции
         paths['departments'][dept] = dept_path
 
     return paths
