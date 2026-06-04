@@ -3,14 +3,7 @@ import glob
 import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox
-
-# Импортируем модули
-from parsers.file1_parser import parse_file1
-from parsers.file2_parser import parse_file2
-from core.comparator import compare_data
-# ИЗМЕНЕНО: импортируем новую функцию
-from exporters.file4_exporter import export_reports
-from config import FILE3_PATH, FILE4_PATH, OUTPUT_DIR
+from config import OUTPUT_DIR
 
 
 class XPStyleApp:
@@ -287,18 +280,10 @@ class XPStyleApp:
             dir2_path = self.dir2_path.get()
             base_output_dir = self.output_dir.get()
 
-            # Создаём папку для отчёта через сервис
+            # Вызываем обработку через сервис
             from service import WorkloadService
             service = WorkloadService()
-            output_dir = service.create_report_folder(base_output_dir)
-
-            # Обновляем отображение в GUI
-            folder_name = os.path.basename(output_dir)
-            self.output_dir_display.set(f"📁 {folder_name}")
-            print(f"📂 Папка отчёта: {output_dir}")
-
-            # Вызываем обработку через сервис
-            result = service.process_workload(file1_path, dir2_path, output_dir)
+            result = service.process_workload(file1_path, dir2_path, base_output_dir)
 
             if not result.success:
                 self.status_text.set("Ошибка")
@@ -308,22 +293,27 @@ class XPStyleApp:
             # Успех
             self.status_text.set("Готово")
 
-            # Подсчитываем количество созданных файлов по кафедрам
-            dept_count = len(result.department_report_paths) if hasattr(result, 'department_report_paths') else 0
-            dept_msg = f"\n📊 Создано отчётов по кафедрам: {dept_count}" if dept_count > 0 else ""
+            # Обновляем отображение папки с отчётами по кафедрам
+            if result.departments_folder:
+                folder_name = os.path.basename(result.departments_folder)
+                self.output_dir_display.set(f"📁 {folder_name}")
 
+            # Формируем сообщение
+            dept_count = len(result.department_report_paths)
             error_details = ""
             if result.errors:
-                error_details = f"\n\n⚠️ Предупреждения:\n" + "\n".join(result.errors[:3])
+                error_details = f"\n\nПредупреждения:\n" + "\n".join(result.errors[:3])
                 if len(result.errors) > 3:
                     error_details += f"\n... и ещё {len(result.errors) - 3} ошибок"
 
             messagebox.showinfo(
                 "Успех",
-                f"✅ Отчёты сформированы успешно!\n\n"
-                f"👥 Всего проверено: {result.total_count} ППС\n"
-                f"🔍 Требуют внимания: {result.mismatches}{dept_msg}\n\n"
-                f"📁 Папка отчёта:\n{output_dir}"
+                f"Отчёт сформирован успешно!\n\n"
+                f"Всего проверено: {result.total_count} ППС\n"
+                f"Требуют внимания: {result.mismatches}\n"
+                f"Создано отчётов по кафедрам: {dept_count}\n\n"
+                f"Общий отчёт:\n{result.general_report_path}\n\n"
+                f"Отчёты по кафедрам:\n{result.departments_folder}"
                 f"{error_details}"
             )
 
@@ -338,7 +328,6 @@ class XPStyleApp:
             self.btn_generate.config(state="normal")
             if self.status_text.get() != "Ошибка":
                 self.status_text.set("Ожидание")
-
 
 def main():
     root = tk.Tk()

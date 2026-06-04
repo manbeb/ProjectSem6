@@ -1,6 +1,5 @@
 """
 Сервисный слой - прослойка между GUI и бизнес-логикой.
-Инкапсулирует все операции обработки данных.
 """
 import os
 import glob
@@ -10,24 +9,51 @@ from parsers.file2_parser import parse_file2
 from core.comparator import compare_data
 from exporters.file4_exporter import export_reports
 
+
 class WorkloadService:
     def __init__(self):
         self.last_result = None
         self.last_error = None
 
-    def process_workload(self, file1_path: str, dir2_path: str, output_dir: str) -> 'ProcessingResult':
+    def process_workload(
+        self,
+        file1_path: str,
+        dir2_path: str,
+        user_selected_dir: str
+    ) -> 'ProcessingResult':
+        """
+        Основная операция: обработка и сравнение нагрузки.
+
+        Args:
+            file1_path: Путь к Файлу 1 (план из ИС ВВГУ)
+            dir2_path: Путь к папке с Файлами 2 (индивидуальные планы)
+            user_selected_dir: Папка, выбранная пользователем (например, Документы)
+        """
         try:
+            # Валидация
             if not os.path.exists(file1_path):
                 return ProcessingResult(success=False, error=f"Файл 1 не найден: {file1_path}")
             if not os.path.isdir(dir2_path):
                 return ProcessingResult(success=False, error=f"Папка с Файлами 2 не найдена: {dir2_path}")
 
-            os.makedirs(output_dir, exist_ok=True)
-            file3_path = os.path.join(output_dir, "Файл 3_Агрегированный.xlsx")
+            # === СОЗДАЁМ СТРУКТУРУ ПАПОК ===
+            # Базовая папка проекта (внутри выбранной пользователем)
+            project_dir = os.path.join(user_selected_dir, "Нагрузка_ППС_ВВГУ")
+            os.makedirs(project_dir, exist_ok=True)
 
+            # Пути для общих отчётов
+            file3_path = os.path.join(project_dir, "Файл 3_Агрегированный.xlsx")
+
+            # Подпапка с датой для отчётов по кафедрам
+            date_str = datetime.now().strftime("%d.%m.%Y")
+            departments_dir = os.path.join(project_dir, f"Отчёт_Нагрузка_{date_str}")
+            os.makedirs(departments_dir, exist_ok=True)
+
+            # === ШАГ 1: Чтение Файла 1 ===
             file1_df = parse_file1(file1_path)
             file1_df.to_excel(file3_path, index=False)
 
+            # === ШАГ 2: Чтение Файлов 2 ===
             file2_paths = glob.glob(os.path.join(dir2_path, "*.xlsx"))
             if not file2_paths:
                 return ProcessingResult(success=False, error="В выбранной папке не найдены файлы Excel")
@@ -42,11 +68,14 @@ class WorkloadService:
                 except Exception as e:
                     errors.append(f"Ошибка чтения {os.path.basename(path)}: {str(e)}")
 
+            # === ШАГ 3: Сравнение ===
             result_df = compare_data(file1_df, file2_records)
 
-            # 🆕 Экспорт отчётов (общий + по кафедрам)
-            export_paths = export_reports(result_df, output_dir)
+            # === ШАГ 4: Экспорт ===
+            # Передаём project_dir для общих отчётов и departments_dir для кафедр
+            export_paths = export_reports(result_df, project_dir, departments_dir)
 
+            # Статистика
             mismatches = result_df[
                 result_df['Статус'].str.contains('Расхождение|Отсутствует', na=False)
             ].shape[0]
@@ -55,8 +84,10 @@ class WorkloadService:
                 success=True,
                 total_count=len(result_df),
                 mismatches=mismatches,
+                project_dir=project_dir,
                 general_report_path=export_paths['general'],
                 department_report_paths=export_paths['departments'],
+                departments_folder=departments_dir,
                 errors=errors
             )
             self.last_result = result
@@ -65,27 +96,33 @@ class WorkloadService:
         except Exception as e:
             return ProcessingResult(success=False, error=str(e))
 
-    def create_report_folder(self, base_dir: str) -> str:
-        date_str = datetime.now().strftime("%d.%m.%Y")
-        folder_name = f"Отчёт_Нагрузка_{date_str}"
-        output_dir = os.path.join(base_dir, folder_name)
-        os.makedirs(output_dir, exist_ok=True)
-        return output_dir
-
     def get_default_output_dir(self) -> str:
+        """Возвращает папку по умолчанию (просто Документы, без подпапок)"""
         from pathlib import Path
         documents = Path.home() / "Documents"
-        return str(documents / "Нагрузка_ППС_ВВГУ")
+        return str(documents)
+
 
 class ProcessingResult:
-    def __init__(self, success: bool, total_count: int = 0, mismatches: int = 0,
-                 general_report_path: str = None, department_report_paths: dict = None,
-                 errors: list = None, error: str = None):
+    def __init__(
+        self,
+        success: bool,
+        total_count: int = 0,
+        mismatches: int = 0,
+        project_dir: str = None,
+        general_report_path: str = None,
+        department_report_paths: dict = None,
+        departments_folder: str = None,
+        errors: list = None,
+        error: str = None
+    ):
         self.success = success
         self.total_count = total_count
         self.mismatches = mismatches
+        self.project_dir = project_dir
         self.general_report_path = general_report_path
         self.department_report_paths = department_report_paths or {}
+        self.departments_folder = departments_folder
         self.errors = errors or []
         self.error = error
 
