@@ -7,6 +7,7 @@ from parsers.file2_parser import parse_file2
 from core.comparator import compare_data
 from exporters.file4_exporter import export_file4
 
+
 def main():
     print("🚀 Запуск процедуры сравнения нагрузки ППС ВВГУ...")
     os.makedirs(os.path.dirname(FILE3_PATH), exist_ok=True)
@@ -25,19 +26,10 @@ def main():
         print("   ⚠️ В папке input_files не найдено Excel-файлов. Поместите туда Файлы 2.")
         return
 
-    DEPT_MAPPING = {
-        "Шумик_КафедраИБ.xlsx": "Кафедра ИБ",
-        "Шумик_КафедраПО.xlsx": "Кафедра ПО",
-        # Добавьте остальные файлы
-    }
-
     file2_records = []
     for path in file2_paths:
-        filename = os.path.basename(path)
-        # Берём кафедру из маппинга или пытаемся автоопределить
-        dept = DEPT_MAPPING.get(filename)
-
-        rec = parse_file2(path, department_override=dept)
+        # Парсим файл БЕЗ явного указания кафедры - она будет определена автоматически
+        rec = parse_file2(path)
         if rec:
             file2_records.append(rec)
 
@@ -55,6 +47,7 @@ def main():
     # Итоговая статистика
     mismatches = result_df[result_df['Статус'].str.contains('Расхождение|Отсутствует', na=False)].shape[0]
     print(f"\n📊 ОТЧЁТ: Всего проверено {len(result_df)} ППС. Требуют внимания: {mismatches}")
+
 
 if __name__ == "__main__":
     main()

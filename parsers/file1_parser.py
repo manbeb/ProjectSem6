@@ -32,7 +32,7 @@ def parse_file1() -> pd.DataFrame:
     df = df_raw.iloc[header_idx + 1:].copy()
     df.columns = col_names
 
-    # 🔑 КРИТИЧНОЕ ИСПРАВЛЕНИЕ: Ищем колонки по ИНДЕКСАМ, чтобы обойти дубликаты имён
+    # 🔑 Ищем колонки по ИНДЕКСАМ, чтобы обойти дубликаты имён
     def get_col_index(keyword):
         for i, name in enumerate(df.columns):
             if keyword in str(name):
@@ -41,9 +41,10 @@ def parse_file1() -> pd.DataFrame:
 
     idx_fio = get_col_index('Преподаватель')
     idx_dep = get_col_index('Кафедра')
+    idx_position = get_col_index('Должность')  # Добавляем поиск должности
     idx_plan = get_col_index('План')
 
-    # Fallback для Плана, если не нашли по тексту (обычно одна из последних колонок)
+    # Fallback для Плана, если не нашли по тексту
     if idx_plan is None:
         idx_plan = len(df.columns) - 3
         print(f"⚠️ Колонка 'План' не найдена по тексту. Используем позиционный индекс: {idx_plan}")
@@ -51,23 +52,31 @@ def parse_file1() -> pd.DataFrame:
     if idx_fio is None or idx_dep is None:
         raise ValueError("❌ Не найдены индексы колонок ФИО или Кафедра")
 
-    # Выбираем данные строго по позициям. Теперь у нас ровно 3 колонки с уникальными именами.
+    # Выбираем данные строго по позициям
     df_clean = df.iloc[:, [idx_fio, idx_dep, idx_plan]].copy()
     df_clean.columns = ['Преподаватель', 'Кафедра', 'План']
+
+    # Если должность найдена, добавляем её
+    if idx_position is not None:
+        df_clean['Должность'] = df.iloc[:, idx_position].copy()
+    else:
+        df_clean['Должность'] = 'Не указана'
 
     # 3. Очистка и фильтрация пустых строк
     df_clean = df_clean[df_clean['Преподаватель'].astype(str).str.strip() != '']
     df_clean['Кафедра'] = df_clean['Кафедра'].astype(str).str.strip()
+    df_clean['Должность'] = df_clean['Должность'].astype(str).str.strip()
 
     # 4. Безопасная конвертация 'План' в числа
-    # df_clean['План'] теперь гарантированно Series, ошибка не повторится
     plan_s = df_clean['План'].astype(str)
     plan_s = plan_s.str.replace(',', '.', regex=False).str.replace(r'[^\d.]', '', regex=True)
     df_clean['План'] = pd.to_numeric(plan_s, errors='coerce').fillna(0)
 
-    # 5. Агрегация по ФИО + Кафедра (Формирование Файла 3)
+    # 5. Агрегация по ФИО + Кафедра + Должность (Формирование Файла 3)
     df_clean['ФИО_очищенное'] = df_clean['Преподаватель'].apply(clean_name)
-    agg = df_clean.groupby(['ФИО_очищенное', 'Кафедра'], as_index=False)['План'].sum()
+
+    # Группируем по ФИО, Кафедре и Должности, суммируем часы
+    agg = df_clean.groupby(['ФИО_очищенное', 'Кафедра', 'Должность'], as_index=False)['План'].sum()
     agg.rename(columns={'План': 'План_ИС_ВВГУ'}, inplace=True)
 
     return agg

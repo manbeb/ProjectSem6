@@ -4,38 +4,43 @@ import os
 from typing import Dict, Optional
 
 
-def parse_file2(filepath: str, department_override: str = None) -> Optional[Dict]:
+def parse_file2(filepath: str) -> Optional[Dict]:
     wb = openpyxl.load_workbook(filepath, data_only=True)
+
+    # Ищем лист с итогами
     sheet = None
     for name in wb.sheetnames:
         if 'ИТОГ' in name.upper():
             sheet = wb[name]
             break
+
     if not sheet:
         wb.close()
         return None
 
+    # 1. Извлекаем ФИО и Должность из первых строк
     fio = "Неизвестный"
+    position = "Не указана"
+
     for row_idx in range(1, 15):
         cell_val = str(sheet.cell(row=row_idx, column=1).value or "")
-        if any(x in cell_val for x in ['Заведующий', 'Доцент', 'Старший', 'Профессор', 'Ассистент']):
-            match = re.match(
-                r'^([А-Яа-яЁё\.\s\-]+?)(?:\s{2,}|,|\s+Заведующий|\s+Доцент|\s+Профессор|\s+Старший|\s+Ассистент)',
-                cell_val)
-            if match:
-                fio = match.group(1).strip()
-            else:
-                fio = cell_val.split('Заведующий')[0].split('Доцент')[0].split('Профессор')[0].strip()
+        # Паттерн: "Шумик Е.Г.    Заведующий кафедрой, 1 ст."
+        if any(pos in cell_val for pos in ['Заведующий', 'Доцент', 'Профессор', 'Старший', 'Ассистент']):
+            # Извлекаем ФИО (до множества пробелов или запятой)
+            match_fio = re.match(r'^([А-Яа-яЁё\.\s\-]+?)(?:\s{2,}|,)', cell_val)
+            if match_fio:
+                fio = match_fio.group(1).strip()
+
+            # Извлекаем Должность (после пробелов до запятой)
+            match_pos = re.search(r'(Заведующий кафедрой|Доцент|Профессор|Старший преподаватель|Ассистент)', cell_val)
+            if match_pos:
+                position = match_pos.group(1).strip()
             break
 
-    department = department_override
-    if not department:
-        # Автоизвлечение из имени файла: Иванов_КафедраИБ.xlsx -> КафедраИБ
-        dept_match = re.search(r'[_\-]([А-Яа-яЁё\s]+)\.xlsx', os.path.basename(filepath), re.IGNORECASE)
-        department = dept_match.group(1).strip() if dept_match else "Не указана"
-
+    # 2. Парсим таблицу итогов (суммируем часы)
     totals = {}
     fact_hours = None
+
     for row_idx in range(1, sheet.max_row + 1):
         cell_b = str(sheet.cell(row=row_idx, column=2).value or "")
         cell_c = sheet.cell(row=row_idx, column=3).value
@@ -62,11 +67,12 @@ def parse_file2(filepath: str, department_override: str = None) -> Optional[Dict
                 totals['Поручения'] = float(cell_c)
 
     plan_total = sum(v for v in totals.values() if v is not None)
+
     wb.close()
 
     return {
         'ФИО': fio,
-        'Кафедра': department,
+        'Должность': position,  # <-- Добавили должность
         'План_Из_Файла2': plan_total if plan_total > 0 else totals.get('Учебная', 0),
         'Факт_Из_Файла2': fact_hours,
         'Источник': os.path.basename(filepath)
