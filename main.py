@@ -25,12 +25,6 @@ def main():
         print("   ⚠️ В папке input_files не найдено Excel-файлов. Поместите туда Файлы 2.")
         return
 
-    file2_records = []
-    for path in file2_paths:
-        rec = parse_file2(path)
-        if rec: file2_records.append(rec)
-    print(f"   ✅ Обработано планов: {len(file2_records)}")
-
     DEPT_MAPPING = {
         "Шумик_КафедраИБ.xlsx": "Кафедра ИБ",
         "Шумик_КафедраПО.xlsx": "Кафедра ПО",
