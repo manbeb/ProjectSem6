@@ -36,8 +36,12 @@ class XPStyleApp:
         self.file1_display = tk.StringVar(value="Файл не выбран")
         self.file_count = tk.IntVar(value=0)
         self.status_text = tk.StringVar(value="Ожидание")
-        self.output_dir = tk.StringVar(value=OUTPUT_DIR)  # Полный путь
-        self.output_dir_display = tk.StringVar(value=os.path.basename(OUTPUT_DIR))  # Для отображения
+
+        os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+        self.output_dir = tk.StringVar(value=OUTPUT_DIR)
+        self.output_dir_display = tk.StringVar(value=f"📁 {os.path.basename(OUTPUT_DIR)}")
+
         self.is_processing = False
 
         self.create_widgets()
@@ -277,36 +281,72 @@ class XPStyleApp:
 
     def run_processing(self):
         try:
+            print("🚀 Запуск процедуры сравнения нагрузки ППС ВВГУ...")
+
             file1_path = self._file1_full_path
             dir2_path = self.dir2_path.get()
             output_dir = self.output_dir.get()
 
-            os.makedirs(OUTPUT_DIR, exist_ok=True)
+            os.makedirs(output_dir, exist_ok=True)
 
-            # Шаг 1: Чтение Файла 1
-            # file1_df = parse_file1(file1_path)
-            # file1_df.to_excel(FILE3_PATH, index=False)
+            # Формируем полные пути для сохранения
+            file3_path = os.path.join(output_dir, "Файл 3_Агрегированный.xlsx")
+            file4_path = os.path.join(output_dir, "Файл 4_Сравнение.xlsx")
 
-            # Шаг 2: Чтение Файлов 2
+            # === Шаг 1: Чтение Файла 1 ===
+            print("📖 Шаг 1: Чтение и агрегация Файла 1...")
+            # ВАЖНО: parse_file1 теперь принимает путь как аргумент
+            file1_df = parse_file1(file1_path)
+            file1_df.to_excel(file3_path, index=False)
+            print(f"   ✅ Файл 3 сохранён: {file3_path}")
+
+            # === Шаг 2: Чтение Файлов 2 ===
+            print("📂 Шаг 2: Поиск и парсинг индивидуальных планов...")
             file2_paths = glob.glob(os.path.join(dir2_path, "*.xlsx"))
+
+            if not file2_paths:
+                print("   ⚠️ В папке не найдено Excel-файлов!")
+                self.status_text.set("Ошибка")
+                messagebox.showwarning("Внимание", "В выбранной папке не найдены файлы Excel!")
+                return
+
             file2_records = []
             for path in file2_paths:
-                # rec = parse_file2(path)
-                # if rec: file2_records.append(rec)
-                pass
+                print(f"   ⏳ Чтение: {os.path.basename(path)}")
+                try:
+                    rec = parse_file2(path)
+                    if rec:
+                        file2_records.append(rec)
+                except Exception as e:
+                    print(f"   ❌ Ошибка чтения {os.path.basename(path)}: {e}")
 
-            # Шаг 3: Сравнение
-            # result_df = compare_data(file1_df, file2_records)
+            print(f"   ✅ Обработано планов: {len(file2_records)}")
 
-            # Шаг 4: Экспорт
-            # export_file4(result_df, FILE4_PATH)
+            # === Шаг 3: Сравнение ===
+            print("⚖️ Шаг 3: Сравнение нагрузок...")
+            # compare_data принимает DataFrame из Файла 1 и список словарей из Файлов 2
+            result_df = compare_data(file1_df, file2_records)
+            print("   ✅ Сравнение завершено.")
+
+            # === Шаг 4: Экспорт ===
+            print("💾 Шаг 4: Формирование отчёта с подсветкой...")
+            # export_file4 принимает DataFrame и путь для сохранения
+            export_file4(result_df, file4_path)
+            print(f"   ✅ Готово! Результат: {file4_path}")
+
+            # Итоговая статистика
+            mismatches = result_df[result_df['Статус'].str.contains('Расхождение|Отсутствует', na=False)].shape[0]
+            print(f"\n📊 ОТЧЁТ: Всего проверено {len(result_df)} ППС. Требуют внимания: {mismatches}")
 
             self.status_text.set("Готово")
-            messagebox.showinfo("Успех", "Отчёт сформирован успешно!")
+            messagebox.showinfo("Успех", f"Отчёт сформирован успешно!\n\nНайдено расхождений: {mismatches}")
 
         except Exception as e:
+            import traceback
+            error_msg = f"{str(e)}\n\n{traceback.format_exc()}"
+            print(f"\n ОШИБКА: {error_msg}")
             self.status_text.set("Ошибка")
-            messagebox.showerror("Ошибка", str(e))
+            messagebox.showerror("Ошибка", f"Произошла ошибка:\n{str(e)}")
         finally:
             self.is_processing = False
             self.btn_generate.config(state="normal")
