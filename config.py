@@ -1,17 +1,14 @@
 import os
 from openpyxl.styles import PatternFill
-from pathlib import Path
 
 # Базовые пути
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FILE1_PATH = os.path.join(BASE_DIR, "Файл 1.xlsx")
 FILE2_DIR = os.path.join(BASE_DIR, "input_files")  # Сюда класть Файлы 2
-
-DOCUMENTS_DIR = os.path.join(Path.home(), "Documents")
-OUTPUT_DIR = os.path.join(DOCUMENTS_DIR, "Нагрузка_ППС_ВВГУ")
+OUTPUT_DIR = os.path.join(BASE_DIR, "output")
 
 FILE3_PATH = os.path.join(OUTPUT_DIR, "Файл 3_Агрегированный.xlsx")
-FILE4_PATH = os.path.join(OUTPUT_DIR, "Файл 4_Сравнение.xlsx")
+FILE4_PATH = os.path.join(OUTPUT_DIR, "Отчёт_общий.xlsx")  # Новое имя
 
 # Настройки ТЗ
 TOLERANCE_HOURS = 5.0

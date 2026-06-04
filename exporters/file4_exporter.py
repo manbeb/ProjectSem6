@@ -1,37 +1,64 @@
 import pandas as pd
+import os
+import re
 import openpyxl
-from openpyxl.styles import Font
-from config import FILE4_PATH, YELLOW_FILL, BLUE_HEADER
+from openpyxl.styles import PatternFill, Font, Alignment
+
+YELLOW_FILL = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
+BLUE_HEADER = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
 
 
-def export_file4(df: pd.DataFrame, output_path: str = None):
-    """
-    Создаёт Файл 4: Excel с результатами сравнения и условным форматированием.
-    """
-    if output_path is None:
-        output_path = FILE4_PATH
-
-    # 1. Сохраняем DataFrame
-    df.to_excel(output_path, index=False, sheet_name="Сравнение")
-
-    # 2. Открываем ИМЕННО тот файл, который сохранили
-    wb = openpyxl.load_workbook(output_path)  # ← было FILE4_PATH (баг!)
+def _apply_formatting(filepath: str, df: pd.DataFrame):
+    """Применяет стилизацию к уже сохранённому Excel-файлу."""
+    wb = openpyxl.load_workbook(filepath)
     ws = wb.active
 
-    # 3. Стилизация заголовка
+    # Стилизация шапки
     for col in range(1, len(df.columns) + 1):
         cell = ws.cell(row=1, column=col)
-        cell.fill = BLUE_HEADER
-        cell.font = Font(color="FFFFFF", bold=True)
-        cell.alignment = openpyxl.styles.Alignment(wrap_text=True)
+        cell.font = Font(color="000000", bold=True)
+        cell.alignment = Alignment(wrap_text=True)
 
-    # 4. Подсветка строк
+    # Подсветка строк с расхождениями
     for i, row in df.iterrows():
-        status = str(row['Статус']).strip()  # ← strip() убирает пробелы из comparator.py
-        if "Расхождение" in status or "Отсутствует" in status:
+        status = str(row.get('Статус', ''))
+        if 'Расхождение' in status or 'Отсутствует' in status:
             for col in range(1, len(df.columns) + 1):
                 ws.cell(row=i + 2, column=col).fill = YELLOW_FILL
 
-    # 5. Сохраняем ИМЕННО в тот файл
-    wb.save(output_path)  # ← было FILE4_PATH (баг!)
+    wb.save(filepath)
     wb.close()
+
+
+def export_reports(result_df: pd.DataFrame, output_dir: str) -> dict:
+    """
+    Экспортирует общий отчёт и отдельные отчёты по кафедрам.
+    Возвращает словарь с путями: {'general': ..., 'departments': {кафедра: путь}}
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    paths = {'general': '', 'departments': {}}
+
+    # 1. Общий отчёт
+    general_path = os.path.join(output_dir, "Отчёт_общий.xlsx")
+    result_df.to_excel(general_path, index=False, sheet_name="Сравнение")
+    _apply_formatting(general_path, result_df)
+    paths['general'] = general_path
+
+    # 2. Отчёты по кафедрам
+    df_clean = result_df.copy()
+    # Безопасная обработка названий кафедр
+    df_clean['Кафедра'] = df_clean['Кафедра'].fillna("Не указана").astype(str).str.strip()
+
+    grouped = df_clean.groupby('Кафедра')
+    for dept, group_df in grouped:
+        # Очищаем название от недопустимых символов для имён файлов
+        clean_dept = re.sub(r'[\\/*?:"<>|]', "_", dept)
+        if not clean_dept:
+            clean_dept = "Без_кафедры"
+
+        dept_path = os.path.join(output_dir, f"Отчёт_{clean_dept}.xlsx")
+        group_df.to_excel(dept_path, index=False, sheet_name="Сравнение")
+        _apply_formatting(dept_path, group_df)
+        paths['departments'][dept] = dept_path
+
+    return paths

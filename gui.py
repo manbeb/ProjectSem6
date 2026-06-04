@@ -4,11 +4,12 @@ import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
-# Импортируем твои модули
+# Импортируем модули
 from parsers.file1_parser import parse_file1
 from parsers.file2_parser import parse_file2
 from core.comparator import compare_data
-from exporters.file4_exporter import export_file4
+# ИЗМЕНЕНО: импортируем новую функцию
+from exporters.file4_exporter import export_reports
 from config import FILE3_PATH, FILE4_PATH, OUTPUT_DIR
 
 
@@ -20,7 +21,7 @@ class XPStyleApp:
         self.root.resizable(False, False)
 
         # Цвета ВВГУ
-        self.bg_color = "#F5F5F5"  # Светло-серый фон (чище, чем бежевый XP)
+        self.bg_color = "#F5F5F5"  # Светло-серый фон
         self.blue_color = "#2E5EA3"  # Фирменный синий ВВГУ
         self.blue_light = "#4A7BC9"  # Светлее для эффекта объема
         self.orange_color = "#EB7124"  # Фирменный оранжевый ВВГУ
@@ -51,7 +52,7 @@ class XPStyleApp:
         header_frame = tk.Frame(self.root, bg=self.bg_color)
         header_frame.pack(fill="x", padx=20, pady=(20, 15))
 
-        # Логотип ВВГУ (оранжевый)
+        # Логотип ВВГУ (синий)
         logo_label = tk.Label(header_frame,
                               text="ВВГУ",
                               font=("Arial", 22, "bold"),
@@ -106,7 +107,7 @@ class XPStyleApp:
         frame = tk.Frame(self.root, bg=self.bg_color)
         frame.pack(fill="x", padx=20, pady=10)
 
-        # Синяя панель с эффектом объема (светлая граница сверху)
+        # Синяя панель с эффектом объема
         blue_panel = tk.Frame(frame, bg=self.blue_color,
                               relief="flat", borderwidth=0,
                               highlightbackground=self.blue_light,
@@ -229,8 +230,8 @@ class XPStyleApp:
             filetypes=[("Excel files", "*.xlsx *.xls")]
         )
         if path:
-            self.file1_path.set(path)  # Было: os.path.basename(path)
-            self.file1_display.set(f"📄 {os.path.basename(path)}")  # ДОБАВИТЬ
+            self.file1_path.set(path)
+            self.file1_display.set(f"📄 {os.path.basename(path)}")
             self._file1_full_path = path
 
     def select_dir2(self):
@@ -241,7 +242,7 @@ class XPStyleApp:
         path = filedialog.askdirectory(title="Выберите папку с отчётами кафедр")
         if path:
             self.dir2_path.set(path)
-            self.dir2_display.set(f"📁 {os.path.basename(os.path.normpath(path))}")  # ДОБАВИТЬ
+            self.dir2_display.set(f"📁 {os.path.basename(os.path.normpath(path))}")
             files = glob.glob(os.path.join(path, "*.xlsx"))
             self.file_count.set(len(files))
 
@@ -267,7 +268,6 @@ class XPStyleApp:
             messagebox.showerror("Ошибка", "Выберите папку с отчётами кафедр!")
             return
 
-        # НОВАЯ проверка
         if not self.output_dir.get():
             messagebox.showerror("Ошибка", "Выберите папку для сохранения результатов!")
             return
@@ -308,18 +308,22 @@ class XPStyleApp:
             # Успех
             self.status_text.set("Готово")
 
+            # Подсчитываем количество созданных файлов по кафедрам
+            dept_count = len(result.department_report_paths) if hasattr(result, 'department_report_paths') else 0
+            dept_msg = f"\n📊 Создано отчётов по кафедрам: {dept_count}" if dept_count > 0 else ""
+
             error_details = ""
             if result.errors:
-                error_details = f"\n\nПредупреждения:\n" + "\n".join(result.errors[:3])
+                error_details = f"\n\n⚠️ Предупреждения:\n" + "\n".join(result.errors[:3])
                 if len(result.errors) > 3:
                     error_details += f"\n... и ещё {len(result.errors) - 3} ошибок"
 
             messagebox.showinfo(
                 "Успех",
-                f"Отчёт сформирован успешно!\n\n"
-                f"Всего проверено: {result.total_count} ППС\n"
-                f"Требуют внимания: {result.mismatches}\n\n"
-                f"Папка отчёта:\n{output_dir}"
+                f"✅ Отчёты сформированы успешно!\n\n"
+                f"👥 Всего проверено: {result.total_count} ППС\n"
+                f"🔍 Требуют внимания: {result.mismatches}{dept_msg}\n\n"
+                f"📁 Папка отчёта:\n{output_dir}"
                 f"{error_details}"
             )
 
