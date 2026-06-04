@@ -82,9 +82,9 @@ def compare_data(file1_df: pd.DataFrame, file2_records: list) -> pd.DataFrame:
             'Кафедра': dept,
             'План (ИС ВВГУ)': round(plan_is, 2) if plan_is > 0 else "Нет данных",
             'План (Файл 2)': round(plan_f2, 2),
-            'Факт (Файл 2)': round(fact_f2, 2) if fact_f2 is not None else "-",
+ #           'Факт (Файл 2)': round(fact_f2, 2) if fact_f2 is not None else "-",
             'Разница План - ИС': round(diff_plan, 2) if plan_is > 0 else "-",
-            'Разница План - Факт': round(diff_fact, 2) if diff_fact is not None else "-",
+ #           'Разница План - Факт': round(diff_fact, 2) if diff_fact is not None else "-",
             'Статус': status,
             'Файлы-источники': ", ".join(set(data['Источники']))
         })
