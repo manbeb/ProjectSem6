@@ -6,10 +6,6 @@
 import os
 import glob
 from datetime import datetime
-from typing import Optional, Tuple
-import pandas as pd
-
-from config import FILE1_PATH, FILE2_DIR, OUTPUT_DIR
 from parsers.file1_parser import parse_file1
 from parsers.file2_parser import parse_file2
 from core.comparator import compare_data
