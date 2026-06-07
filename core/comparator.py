@@ -5,7 +5,7 @@ from core.name_utils import names_match
 
 def compare_data(file1_df: pd.DataFrame, file2_records: list) -> pd.DataFrame:
     """
-    file1_df: DataFrame с колонками ['ФИО_очищенное', 'Кафедра', 'Должность', 'План_ИС_ВВГУ']
+    file1_df: DataFrame с колонками ['ФИ', 'Кафедра', 'Должность', 'План_ИС_ВВГУ']
     file2_records: список словарей из парсера Файла 2
     """
     grouped_data = {}
@@ -15,10 +15,10 @@ def compare_data(file1_df: pd.DataFrame, file2_records: list) -> pd.DataFrame:
         fio_2 = rec['ФИО']
         pos_2 = rec.get('Должность', '')
 
-        # Находим Кафедру в Файле 1 по совпадению ФИО и Должности
+        # Находим Кафедру в Файле 1 по совпадению ФИ и Должности
         found_dept = None
         for _, row1 in file1_df.iterrows():
-            if names_match(fio_2, row1['ФИО_очищенное']):
+            if names_match(fio_2, row1['ФИ']):
                 if pos_2 in str(row1['Должность']) or str(row1['Должность']) in pos_2:
                     found_dept = row1['Кафедра']
                     break
@@ -46,6 +46,7 @@ def compare_data(file1_df: pd.DataFrame, file2_records: list) -> pd.DataFrame:
         grouped_data[key]['Источники'].append(rec['Источник'])
 
     results = []
+
     # 2. Формируем итоговые строки
     for key, data in grouped_data.items():
         fio, dept = key
@@ -53,12 +54,13 @@ def compare_data(file1_df: pd.DataFrame, file2_records: list) -> pd.DataFrame:
         fact_f2 = data['Факт_Сумма'] if data['Есть_Факт'] else None
 
         # 3. Считаем общий план из ИС ВВГУ для этой кафедры
-        # Суммируем ВСЕ строки, где совпадает ФИО и Кафедра (должности игнорируются)
+        # ЗАМЕНА: file1_df['ФИО_очищенное'] -> file1_df['ФИ']
         mask_is = (file1_df['Кафедра'] == dept) & \
-                  (file1_df['ФИО_очищенное'].apply(lambda x: names_match(fio, x)))
+                  (file1_df['ФИ'].apply(lambda x: names_match(fio, x)))
+
         plan_is = file1_df.loc[mask_is, 'План_ИС_ВВГУ'].sum()
 
-        status = ""
+        status = " "
         highlight = False
 
         if plan_is > 0:
@@ -82,9 +84,9 @@ def compare_data(file1_df: pd.DataFrame, file2_records: list) -> pd.DataFrame:
             'Кафедра': dept,
             'План (ИС ВВГУ)': round(plan_is, 2) if plan_is > 0 else "Нет данных",
             'План (Файл 2)': round(plan_f2, 2),
- #           'Факт (Файл 2)': round(fact_f2, 2) if fact_f2 is not None else "-",
+            'Факт (Файл 2)': round(fact_f2, 2) if fact_f2 is not None else "-",
             'Разница План - ИС': round(diff_plan, 2) if plan_is > 0 else "-",
- #           'Разница План - Факт': round(diff_fact, 2) if diff_fact is not None else "-",
+            'Разница План - Факт': round(diff_fact, 2) if diff_fact is not None else "-",
             'Статус': status,
             'Файлы-источники': ", ".join(set(data['Источники']))
         })

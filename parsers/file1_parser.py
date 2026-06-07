@@ -75,11 +75,11 @@ def parse_file1(file_path: str = None) -> pd.DataFrame:
     plan_s = plan_s.str.replace(',', '.', regex=False).str.replace(r'[^\d.]', '', regex=True)
     df_clean['План'] = pd.to_numeric(plan_s, errors='coerce').fillna(0)
 
-    # 5. Агрегация по ФИО + Кафедра + Должность (Формирование Файла 3)
-    df_clean['ФИО_очищенное'] = df_clean['Преподаватель'].apply(clean_name)
+    # 5. Агрегация по ФИ + Кафедра + Должность (Формирование Файла 3)
+    df_clean['ФИ'] = df_clean['Преподаватель'].apply(clean_name)
 
-    # Группируем по ФИО, Кафедре и Должности, суммируем часы
-    agg = df_clean.groupby(['ФИО_очищенное', 'Кафедра', 'Должность'], as_index=False)['План'].sum()
+    # Группируем по ФИ, Кафедре и Должности, суммируем часы
+    agg = df_clean.groupby(['ФИ', 'Кафедра', 'Должность'], as_index=False)['План'].sum()
     agg.rename(columns={'План': 'План_ИС_ВВГУ'}, inplace=True)
 
     return agg

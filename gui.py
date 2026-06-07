@@ -3,7 +3,7 @@ import glob
 import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox
-from config import OUTPUT_DIR
+from config import DEFAULT_OUTPUT_DIR
 
 
 class XPStyleApp:
@@ -31,10 +31,10 @@ class XPStyleApp:
         self.file_count = tk.IntVar(value=0)
         self.status_text = tk.StringVar(value="Ожидание")
 
-        os.makedirs(OUTPUT_DIR, exist_ok=True)
+        os.makedirs(DEFAULT_OUTPUT_DIR, exist_ok=True)
 
-        self.output_dir = tk.StringVar(value=OUTPUT_DIR)
-        self.output_dir_display = tk.StringVar(value=f"📁 {os.path.basename(OUTPUT_DIR)}")
+        self.output_dir = tk.StringVar(value=DEFAULT_OUTPUT_DIR)
+        self.output_dir_display = tk.StringVar(value=f"📁 {os.path.basename(DEFAULT_OUTPUT_DIR)}")
 
         self.is_processing = False
 
@@ -232,12 +232,17 @@ class XPStyleApp:
             messagebox.showwarning("Внимание", "Идёт обработка. Дождитесь завершения.")
             return
 
-        path = filedialog.askdirectory(title="Выберите папку с отчётами кафедр")
+        path = filedialog.askdirectory(title="Выберите корневую папку с отчетами кафедр (содержит подпапки)")
         if path:
             self.dir2_path.set(path)
             self.dir2_display.set(f"📁 {os.path.basename(os.path.normpath(path))}")
-            files = glob.glob(os.path.join(path, "*.xlsx"))
-            self.file_count.set(len(files))
+
+            # Рекурсивный подсчет .xlsx файлов во всех подпапках
+            file_count = 0
+            for root, dirs, files in os.walk(path):
+                file_count += sum(1 for f in files if f.lower().endswith(('.xlsx', '.xls')))
+
+            self.file_count.set(file_count)
 
     def select_output_dir(self):
         if self.is_processing:

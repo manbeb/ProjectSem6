@@ -42,11 +42,11 @@ class WorkloadService:
             os.makedirs(project_dir, exist_ok=True)
 
             # Пути для общих отчётов
-            file3_path = os.path.join(project_dir, "Файл 3_Агрегированный.xlsx")
+            file3_path = os.path.join(project_dir, "План.xlsx")
 
             # Подпапка с датой для отчётов по кафедрам
             date_str = datetime.now().strftime("%d.%m.%Y")
-            departments_dir = os.path.join(project_dir, f"Отчёт_Нагрузка_{date_str}")
+            departments_dir = os.path.join(project_dir, f"Отчёты_Кафедры_{date_str}")
             os.makedirs(departments_dir, exist_ok=True)
 
             # === ШАГ 1: Чтение Файла 1 ===
@@ -54,19 +54,28 @@ class WorkloadService:
             file1_df.to_excel(file3_path, index=False)
 
             # === ШАГ 2: Чтение Файлов 2 ===
-            file2_paths = glob.glob(os.path.join(dir2_path, "*.xlsx"))
-            if not file2_paths:
-                return ProcessingResult(success=False, error="В выбранной папке не найдены файлы Excel")
-
             file2_records = []
             errors = []
-            for path in file2_paths:
-                try:
-                    rec = parse_file2(path)
-                    if rec:
-                        file2_records.append(rec)
-                except Exception as e:
-                    errors.append(f"Ошибка чтения {os.path.basename(path)}: {str(e)}")
+
+            # Проверяем, есть ли вообще подпапки
+            subdirs = [d for d in os.listdir(dir2_path) if os.path.isdir(os.path.join(dir2_path, d))]
+            if not subdirs:
+                return ProcessingResult(success=False,
+                                        error="В выбранной папке не найдены подпапки кафедр. Проверьте структуру директории.")
+
+            for dept_name in subdirs:
+                dept_dir = os.path.join(dir2_path, dept_name)
+                # Ищем xlsx файлы внутри папки конкретной кафедры
+                for path in glob.glob(os.path.join(dept_dir, "*.xlsx")):
+                    try:
+                        rec = parse_file2(path, department=dept_name)
+                        if rec:
+                            file2_records.append(rec)
+                    except Exception as e:
+                        errors.append(f"Ошибка чтения {os.path.basename(path)}: {str(e)}")
+
+            if not file2_records:
+                return ProcessingResult(success=False, error="Не удалось прочитать ни одного файла из подпапок кафедр.")
 
             # === ШАГ 3: Сравнение ===
             result_df = compare_data(file1_df, file2_records)
