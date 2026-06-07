@@ -69,8 +69,9 @@ def parse_file2(filepath: str, department: str = "Не указана") -> Optio
     return {
         'ФИО': fio,
         'Должность': position,
-        'Кафедра': department,  # <-- Добавили кафедру из имени папки
+        'Кафедра': department,
         'План_Из_Файла2': plan_total if plan_total > 0 else totals.get('Учебная', 0),
         'Факт_Из_Файла2': fact_hours,
-        'Источник': os.path.basename(filepath)
+        'Источник': os.path.basename(filepath),
+        'Детализация': totals  # <-- НОВОЕ ПОЛЕ
     }
