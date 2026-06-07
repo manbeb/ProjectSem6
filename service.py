@@ -7,8 +7,7 @@ from datetime import datetime
 from parsers.file1_parser import parse_file1
 from parsers.file2_parser import parse_file2
 from core.comparator import compare_data
-from exporters.file4_exporter import export_reports
-
+from exporters.file4_exporter import export_reports, _apply_formatting # <-- ДОБАВИЛИ _apply_formatting
 
 class WorkloadService:
     def __init__(self):
@@ -21,51 +20,38 @@ class WorkloadService:
         dir2_path: str,
         user_selected_dir: str
     ) -> 'ProcessingResult':
-        """
-        Основная операция: обработка и сравнение нагрузки.
-
-        Args:
-            file1_path: Путь к Файлу 1 (план из ИС ВВГУ)
-            dir2_path: Путь к папке с Файлами 2 (индивидуальные планы)
-            user_selected_dir: Папка, выбранная пользователем (например, Документы)
-        """
         try:
-            # Валидация
             if not os.path.exists(file1_path):
                 return ProcessingResult(success=False, error=f"Файл 1 не найден: {file1_path}")
             if not os.path.isdir(dir2_path):
                 return ProcessingResult(success=False, error=f"Папка с Файлами 2 не найдена: {dir2_path}")
 
-            # === СОЗДАЁМ СТРУКТУРУ ПАПОК ===
-            # Базовая папка проекта (внутри выбранной пользователем)
-            project_dir = os.path.join(user_selected_dir, "Нагрузка_ППС_ВВГУ")
+            project_dir = os.path.join(user_selected_dir, "Нагрузка ППС ВВГУ")
             os.makedirs(project_dir, exist_ok=True)
 
-            # Пути для общих отчётов
             file3_path = os.path.join(project_dir, "План.xlsx")
-
-            # Подпапка с датой для отчётов по кафедрам
             date_str = datetime.now().strftime("%d.%m.%Y")
-            departments_dir = os.path.join(project_dir, f"Отчёты_Кафедры_{date_str}")
+            departments_dir = os.path.join(project_dir, f"Отчёт по кафедрам {date_str}")
             os.makedirs(departments_dir, exist_ok=True)
 
             # === ШАГ 1: Чтение Файла 1 ===
             file1_df = parse_file1(file1_path)
             file1_df.to_excel(file3_path, index=False)
 
+            # <-- НОВОЕ: Применяем авто-ширину и к Файлу 3
+            _apply_formatting(file3_path, file1_df)
+
             # === ШАГ 2: Чтение Файлов 2 ===
             file2_records = []
             errors = []
 
-            # Проверяем, есть ли вообще подпапки
+            # Проверяем, есть ли подпапки (новая архитектура)
             subdirs = [d for d in os.listdir(dir2_path) if os.path.isdir(os.path.join(dir2_path, d))]
             if not subdirs:
-                return ProcessingResult(success=False,
-                                        error="В выбранной папке не найдены подпапки кафедр. Проверьте структуру директории.")
+                return ProcessingResult(success=False, error="В выбранной папке не найдены подпапки кафедр.")
 
             for dept_name in subdirs:
                 dept_dir = os.path.join(dir2_path, dept_name)
-                # Ищем xlsx файлы внутри папки конкретной кафедры
                 for path in glob.glob(os.path.join(dept_dir, "*.xlsx")):
                     try:
                         rec = parse_file2(path, department=dept_name)
@@ -81,10 +67,8 @@ class WorkloadService:
             result_df = compare_data(file1_df, file2_records)
 
             # === ШАГ 4: Экспорт ===
-            # Передаём project_dir для общих отчётов и departments_dir для кафедр
             export_paths = export_reports(result_df, project_dir, departments_dir)
 
-            # Статистика
             mismatches = result_df[
                 result_df['Статус'].str.contains('Расхождение|Отсутствует', na=False)
             ].shape[0]
@@ -106,7 +90,6 @@ class WorkloadService:
             return ProcessingResult(success=False, error=str(e))
 
     def get_default_output_dir(self) -> str:
-        """Возвращает папку по умолчанию (просто Документы, без подпапок)"""
         from pathlib import Path
         documents = Path.home() / "Documents"
         return str(documents)

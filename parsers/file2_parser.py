@@ -7,7 +7,6 @@ from typing import Dict, Optional
 def parse_file2(filepath: str, department: str = "Не указана") -> Optional[Dict]:
     wb = openpyxl.load_workbook(filepath, data_only=True)
 
-    # Ищем лист с итогами
     sheet = None
     for name in wb.sheetnames:
         if 'ИТОГ' in name.upper():
@@ -18,7 +17,6 @@ def parse_file2(filepath: str, department: str = "Не указана") -> Optio
         wb.close()
         return None
 
-    # 1. Извлекаем ФИО и Должность из первых строк
     fio = "Неизвестный"
     position = "Не указана"
 
@@ -34,16 +32,12 @@ def parse_file2(filepath: str, department: str = "Не указана") -> Optio
                 position = match_pos.group(1).strip()
             break
 
-    # 2. Парсим таблицу итогов (суммируем часы)
+    # Собираем ТОЛЬКО детализацию. Общий факт будет равен сумме этих полей.
     totals = {}
-    fact_hours = None
 
     for row_idx in range(1, sheet.max_row + 1):
         cell_b = str(sheet.cell(row=row_idx, column=2).value or " ")
         cell_c = sheet.cell(row=row_idx, column=3).value
-
-        if 'Фактическое кол-во часов' in cell_b or 'Фактическое кол-во' in cell_b:
-            fact_hours = float(cell_c) if cell_c is not None else None
 
         if cell_c is not None:
             if 'Учебная нагрузка' in cell_b:
@@ -63,15 +57,15 @@ def parse_file2(filepath: str, department: str = "Не указана") -> Optio
             elif 'Поручения' in cell_b:
                 totals['Поручения'] = float(cell_c)
 
-    plan_total = sum(v for v in totals.values() if v is not None)
+    # КРИТИЧЕСКИ ВАЖНО: Факт = сумма детализированных полей. Никаких отдельных ячеек.
+    fact_total = sum(v for v in totals.values() if v is not None)
     wb.close()
 
     return {
         'ФИО': fio,
         'Должность': position,
         'Кафедра': department,
-        'План_Из_Файла2': plan_total if plan_total > 0 else totals.get('Учебная', 0),
-        'Факт_Из_Файла2': fact_hours,
-        'Источник': os.path.basename(filepath),
-        'Детализация': totals  # <-- НОВОЕ ПОЛЕ
+        'Факт_Из_Файла2': fact_total,
+        'Детализация': totals,
+        'Источник': os.path.basename(filepath)
     }
