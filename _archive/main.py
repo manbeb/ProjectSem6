@@ -19,20 +19,25 @@ def main():
     print(f"   ✅ Файл 3 сохранён: {FILE3_PATH}")
 
     # 2. Читаем все Файлы 2
-    print("📂 Шаг 2: Поиск и парсинг индивидуальных планов (Файлы 2)...")
+    print("📂 Шаг 2: Поиск и парсинг индивидуальных планов (Файлы 2)... ")
     os.makedirs(FILE2_DIR, exist_ok=True)
-    file2_paths = glob.glob(os.path.join(FILE2_DIR, "*.xlsx"))
-    if not file2_paths:
-        print("   ⚠️ В папке input_files не найдено Excel-файлов. Поместите туда Файлы 2.")
-        return
 
     file2_records = []
-    for path in file2_paths:
-        rec = parse_file2(path)
-        if rec:
-            file2_records.append(rec)
+    subdirs = [d for d in os.listdir(FILE2_DIR) if os.path.isdir(os.path.join(FILE2_DIR, d))]
 
-    print(f"   ✅ Обработано планов: {len(file2_records)}")
+    if not subdirs:
+        print(
+            "   ⚠️ В папке input_files не найдены подпапки кафедр. Поместите туда папки с названиями кафедр и Файлы 2 внутри.")
+        # Можно добавить fallback на старый поиск, если нужно, но лучше строго следовать новой структуре
+    else:
+        for dept_name in subdirs:
+            dept_dir = os.path.join(FILE2_DIR, dept_name)
+            for path in glob.glob(os.path.join(dept_dir, "*.xlsx")):
+                rec = parse_file2(path, department=dept_name)
+                if rec:
+                    file2_records.append(rec)
+
+    print(f"   ✅ Обработано планов: {len(file2_records)} ")
 
     # 3. Сравнение
     print("⚖️ Шаг 3: Сравнение нагрузок и расчёт разницы...")
