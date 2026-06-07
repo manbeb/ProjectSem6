@@ -2,10 +2,22 @@ import pandas as pd
 from config import TOLERANCE_HOURS
 from core.name_utils import names_match
 
+# Маппинг внутренних ключей в полные наименования для колонок отчёта
+FEATURE_NAMES = {
+    'Учебная': 'Учебная нагрузка',
+    'Неконтактная': 'Неконтактная работа',
+    'Метод': 'Метод. работа',
+    'Электр': 'Электр. обучение',
+    'Научная': 'Научная работа',
+    'Орг': 'Орг. работа',
+    'Повыш': 'Повыш. квалификации',
+    'Поручения': 'Поручения рук. напр.'
+}
+
 
 def compare_data(file1_df: pd.DataFrame, file2_records: list) -> pd.DataFrame:
     grouped_data = {}
-    detail_keys = ['Учебная', 'Неконтактная', 'Метод', 'Электр', 'Научная', 'Орг', 'Повыш', 'Поручения']
+    detail_keys = list(FEATURE_NAMES.keys())  # Берём ключи из маппинга
 
     # 1. Группируем Файл 2 по составному ключу
     for rec in file2_records:
@@ -56,7 +68,8 @@ def compare_data(file1_df: pd.DataFrame, file2_records: list) -> pd.DataFrame:
         # 3. Считаем разницы: План (Файл 1) - Факт (Файл 2)
         diff_detail = {}
         for k in detail_keys:
-            diff_detail[f'Разница_{k}'] = round(detail_plan[k] - detail_fact[k], 2)
+            full_name = FEATURE_NAMES[k]
+            diff_detail[full_name] = round(detail_plan[k] - detail_fact[k], 2)
 
         # 4. Определяем статус
         status = " "
@@ -72,7 +85,7 @@ def compare_data(file1_df: pd.DataFrame, file2_records: list) -> pd.DataFrame:
         else:
             status = "❌ Отсутствует в ИС ВВГУ"
 
-        # 5. Формируем итоговый словарь (БЕЗ колонок Факт_...)
+        # 5. Формируем итоговый словарь
         base_result = {
             'ФИО ППС': fio,
             'Кафедра': dept,
@@ -84,9 +97,10 @@ def compare_data(file1_df: pd.DataFrame, file2_records: list) -> pd.DataFrame:
             'Файлы-источники': ", ".join(set(data['Источники']))
         }
 
-        # Добавляем ТОЛЬКО колонки Разницы
+        # Добавляем колонки с полными наименованиями признаков
         for k in detail_keys:
-            base_result[f'Разница_{k}'] = diff_detail[f'Разница_{k}']
+            full_name = FEATURE_NAMES[k]
+            base_result[full_name] = diff_detail[full_name]
 
         results.append(base_result)
 
