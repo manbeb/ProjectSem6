@@ -2,3 +2,7 @@
 .idea
 output
 input_files
+venv_exe
+build
+dist
+*.spec
