@@ -4,9 +4,8 @@ import re
 import openpyxl
 from openpyxl.styles import PatternFill, Font, Alignment
 from openpyxl.utils import get_column_letter
+from config import YELLOW_FILL
 
-YELLOW_FILL = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
-BLUE_HEADER = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
 
 
 def _apply_formatting(filepath: str, df: pd.DataFrame):

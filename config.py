@@ -10,3 +10,4 @@ DEFAULT_OUTPUT_DIR = os.path.join(os.path.expanduser("~"), "Documents")
 
 # === Стили для Excel ===
 YELLOW_FILL = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
+LIGHT_GRAY_FILL = PatternFill(start_color="D9D9D9", end_color="D9D9D9", fill_type="solid")

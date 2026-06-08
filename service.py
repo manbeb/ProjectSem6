@@ -7,7 +7,7 @@ from datetime import datetime
 from parsers.file1_parser import parse_file1
 from parsers.file2_parser import parse_file2
 from core.comparator import compare_data
-from exporters.file4_exporter import export_reports, _apply_formatting # <-- ДОБАВИЛИ _apply_formatting
+from exporters.file4_exporter import export_reports, _apply_formatting
 
 class WorkloadService:
     def __init__(self):

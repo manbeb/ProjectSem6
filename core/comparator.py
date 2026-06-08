@@ -81,7 +81,7 @@ def compare_data(file1_df: pd.DataFrame, file2_records: list) -> pd.DataFrame:
                 else:
                     status = "Расхождение"
             else:
-                status = "✓ Совпадает"
+                status = "✓ Сходится"
         else:
             status = "❌ Отсутствует в ИС ВВГУ"
 
