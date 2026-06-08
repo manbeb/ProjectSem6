@@ -2,22 +2,24 @@ import pandas as pd
 import os
 import re
 import openpyxl
-from openpyxl.styles import PatternFill, Font, Alignment
+from openpyxl.styles import Font, Alignment
 from openpyxl.utils import get_column_letter
-from config import YELLOW_FILL
-
+from config import YELLOW_FILL, LIGHT_GRAY_FILL
 
 
 def _apply_formatting(filepath: str, df: pd.DataFrame):
+    """Применяет стилизацию и авто-ширину столбцов к Excel-файлу."""
     wb = openpyxl.load_workbook(filepath)
     ws = wb.active
     df = df.reset_index(drop=True)
 
+    # 1. Стилизация шапки (голубой больше не используем, используем светло-серый)
     for col_idx, col_name in enumerate(df.columns, start=1):
         cell = ws.cell(row=1, column=col_idx)
         cell.font = Font(color="000000", bold=True)
         cell.alignment = Alignment(wrap_text=True, vertical="center")
 
+        # Расчёт авто-ширины
         max_length = len(str(col_name))
         for val in df.iloc[:, col_idx - 1]:
             val_str = str(val) if pd.notna(val) else ""
@@ -27,12 +29,22 @@ def _apply_formatting(filepath: str, df: pd.DataFrame):
         new_width = min(max_length + 2, 60)
         ws.column_dimensions[get_column_letter(col_idx)].width = new_width
 
+    # 2. Подсветка строк по статусу
     for row_idx, row in df.iterrows():
         status = str(row.get('Статус', ''))
-        if 'Расхождение' in status or 'Отсутствует' in status:
-            excel_row = row_idx + 2
+        excel_row = row_idx + 2
+
+        # Приоритет: сначала проверяем отсутствие, потом расхождение
+        if 'Отсутствует' in status:
+            fill_color = LIGHT_GRAY_FILL
+        elif 'Расхождение' in status:
+            fill_color = YELLOW_FILL
+        else:
+            fill_color = None
+
+        if fill_color:
             for col in range(1, len(df.columns) + 1):
-                ws.cell(row=excel_row, column=col).fill = YELLOW_FILL
+                ws.cell(row=excel_row, column=col).fill = fill_color
 
     wb.save(filepath)
     wb.close()
@@ -54,13 +66,25 @@ def export_reports(result_df: pd.DataFrame, general_dir: str, departments_dir: s
     df_clean = result_df.copy()
     df_clean['Кафедра'] = df_clean['Кафедра'].fillna("Не указана").astype(str).str.strip()
 
-    # ОБНОВЛЁННЫЙ список числовых колонок с ПОЛНЫМИ наименованиями признаков
     numeric_cols = [
         'План (ИС ВВГУ)', 'Факт (Отчёт кафедры)', 'Разница (План - Факт)',
         'Учебная нагрузка', 'Неконтактная работа', 'Метод. работа',
         'Электр. обучение', 'Научная работа', 'Орг. работа',
         'Повыш. квалификации', 'Поручения рук. напр.'
     ]
+
+    # Умная функция агрегации статуса
+    def aggregate_status(statuses):
+        statuses_list = [str(v) for v in statuses]
+        # Если хотя бы одна запись отсутствует в ИС ВВГУ, флаг должен быть максимальным
+        if any('Отсутствует' in s for s in statuses_list):
+            return '❌ Отсутствует в ИС ВВГУ'
+        # Иначе ищем любое расхождение
+        if any('Расхождение' in s for s in statuses_list):
+            for s in statuses_list:
+                if 'Расхождение' in s:
+                    return s
+        return '✓ Совпадает'
 
     grouped = df_clean.groupby('Кафедра')
     for dept, group_df in grouped:
@@ -70,8 +94,8 @@ def export_reports(result_df: pd.DataFrame, general_dir: str, departments_dir: s
 
         agg_dict = {col: 'sum' for col in numeric_cols if col in group_df.columns}
 
-        agg_dict['Статус'] = lambda x: 'Расхождение' if any(
-            'Расхождение' in str(v) or 'Отсутствует' in str(v) for v in x) else '✓ Совпадает'
+        # Применяем умную агрегацию статуса
+        agg_dict['Статус'] = aggregate_status
         agg_dict['Файлы-источники'] = lambda x: ', '.join(
             sorted(list(set(y.strip() for val in x for y in str(val).split(',')))))
 
